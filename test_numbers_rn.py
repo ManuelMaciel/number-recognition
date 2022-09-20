@@ -8,33 +8,24 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import logging
-
 logger = tf.get_logger()
 
 logger.setLevel(logging.ERROR)
 
 # We get data set and metadata from set
-dataset, metadata = tfds.load("mnist", as_supervised=True, with_info=True)
+dataset, metadata = tfds.load('mnist', as_supervised=True, with_info=True)
 # 60,000 data for training and 10,000 data for validation
-train_dataset, test_dataset = dataset["train"], dataset["test"]
+train_dataset, test_dataset = dataset['train'], dataset['test']
 
 # We define text labels for each possible response from the network
 class_names = [
-    "Cero",
-    "Uno",
-    "Dos",
-    "Tres",
-    "Cuatro",
-    "Cinco",
-    "Seis",
-    "Siete",
-    "Ocho",
-    "Nueve",
+    'Cero', 'Uno', 'Dos', 'Tres', 'Cuatro', 'Cinco', 'Seis',
+    'Siete', 'Ocho', 'Nueve'
 ]
 
 # We obtain the number of examples in variables for later use.
-num_train_examples = metadata.splits["train"].num_examples
-num_test_examples = metadata.splits["test"].num_examples
+num_train_examples = metadata.splits['train'].num_examples
+num_test_examples = metadata.splits['test'].num_examples
 
 # Normalize numbers 0-255
 def normalize(images, labels):
@@ -44,44 +35,90 @@ def normalize(images, labels):
 
 
 train_dataset = train_dataset.map(normalize)
-test_dataset = train_dataset.map(normalize)
+test_dataset = test_dataset.map(normalize)
 
 # Network structure
-model = tf.keras.Sequential(
-    [
-        # Input layer 784 neurons specifying that it will arrive in a 28x28 square layer.
-        tf.keras.layers.Flatten(input_shape=(28, 28, 1)),
-        # Two dense hidden layers of 64 each
-        tf.keras.layers.Dense(64, activation=tf.nn.relu),
-        tf.keras.layers.Dense(64, activation=tf.nn.relu),
-        # Output layer
-        tf.keras.layers.Dense(10, activation=tf.nn.softmax),
-    ]
-)
+
+model = tf.keras.Sequential([
+    # Input layer 784 neurons specifying that it will arrive in a 28x28 square layer.
+	tf.keras.layers.Flatten(input_shape=(28,28,1)),
+    # Two dense hidden layers of 64 each
+	tf.keras.layers.Dense(64, activation=tf.nn.relu),
+	tf.keras.layers.Dense(64, activation=tf.nn.relu),
+    # Output layer
+	tf.keras.layers.Dense(10, activation=tf.nn.softmax) #classification
+])
 
 # Compile model specifying cost function
 # Indicate functions to be used
 model.compile(
-    optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"]
+	optimizer='adam',
+	loss='sparse_categorical_crossentropy',
+	metrics=['accuracy']
 )
+
 
 # Batch learning of 32 each batch
 BATCHSIZE = 32
-# Randomly reorder data in batches of 32
 train_dataset = train_dataset.repeat().shuffle(num_train_examples).batch(BATCHSIZE)
 test_dataset = test_dataset.batch(BATCHSIZE)
 
 # Perform apprenticeship
 model.fit(
-    # Specify times: number of training laps
-    train_dataset,
-    epochs=5,
-    steps_per_epoch=math.ceil(num_train_examples / BATCHSIZE),
+	train_dataset, epochs=5,
+	steps_per_epoch=math.ceil(num_train_examples/BATCHSIZE)
 )
+
 
 # Evaluating the input model against the test dataset
 test_loss, test_accuracy = model.evaluate(
-    test_dataset, steps=math.ceil(num_test_examples / 32)
+	test_dataset, steps=math.ceil(num_test_examples/32)
 )
 
 print("Result: ", test_accuracy)
+
+for test_images, test_labels in test_dataset.take(1):
+	test_images = test_images.numpy()
+	test_labels = test_labels.numpy()
+	predictions = model.predict(test_images)
+
+def plot_image(i, predictions_array, true_labels, images):
+	predictions_array, true_label, img = predictions_array[i], true_labels[i], images[i]
+	plt.grid(False)
+	plt.xticks([])
+	plt.yticks([])
+
+	plt.imshow(img[...,0], cmap=plt.cm.binary)
+
+	predicted_label = np.argmax(predictions_array)
+	if predicted_label == true_label:
+		color = 'blue'
+	else:
+		color = 'red'
+
+	plt.xlabel("Prediction: {}".format(class_names[predicted_label]), color=color)
+
+def plot_value_array(i, predictions_array, true_label):
+	predictions_array, true_label = predictions_array[i], true_label[i]
+	plt.grid(False)
+	plt.xticks([])
+	plt.yticks([])
+	thisplot = plt.bar(range(10), predictions_array, color="#888888")
+	plt.ylim([0,1])
+	predicted_label = np.argmax(predictions_array)
+
+	thisplot[predicted_label].set_color('red')
+	thisplot[true_label].set_color('blue')
+
+numrows=5
+numcols=3
+numimages = numrows*numcols
+
+plt.figure(figsize=(2*2*numcols, 2*numrows))
+for i in range(numimages):
+	plt.subplot(numrows, 2*numcols, 2*i+1)
+	plot_image(i, predictions, test_labels, test_images)
+	plt.subplot(numrows, 2*numcols, 2*i+2)
+	plot_value_array(i, predictions, test_labels)
+
+plt.show()
